@@ -164,14 +164,15 @@ data "aws_iam_policy_document" "github_actions_run_bench" {
     resources = ["*"]
   }
 
-  # DeregisterTaskDefinition is called by Terraform when changing image_tag
-  # forces a revision replacement on aws_ecs_task_definition.bench. Unlike
-  # Register, this action DOES accept resource ARNs, so it's scoped to the
-  # bench family only (no ability to deregister other modules' task defs).
+  # Tag the task definition on Register. The AWS provider's default_tags
+  # block in providers.tf attaches tags to every taggable resource, so
+  # RegisterTaskDefinition implicitly calls ecs:TagResource. Scoped to the
+  # bench family. (No UntagResource: skip_destroy = true on the resource
+  # means Terraform never deregisters / untags old revisions.)
   statement {
-    sid       = "DeregisterBenchTaskDefinition"
+    sid       = "TagBenchTaskDefinition"
     effect    = "Allow"
-    actions   = ["ecs:DeregisterTaskDefinition"]
+    actions   = ["ecs:TagResource"]
     resources = ["arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:task-definition/${local.name_prefix}:*"]
   }
 
@@ -223,14 +224,25 @@ resource "aws_iam_role_policy" "github_actions_run_bench" {
   policy = data.aws_iam_policy_document.github_actions_run_bench.json
 }
 
+# Broad read across all services this module touches — needed because
+# benchmark-promote-image.yml runs `terraform apply`, and apply's refresh
+# phase reads every resource currently in state to compute the diff.
+# ReadOnlyAccess does NOT include kms:Decrypt, so secret values remain
+# protected (GetSecretValue returns encrypted blobs that this role cannot
+# decrypt).
+resource "aws_iam_role_policy_attachment" "github_actions_readonly" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
 # ---------------------------------------------------------------------------- #
 # Second OIDC-assumed role: terraform-plan                                     #
 #                                                                              #
 # Used by the terraform-bench.yml workflow on PRs to run `terraform plan`.    #
-# Separate from `github_actions` because plan needs broad read across every   #
-# resource type in this module (ECS, ECR, IAM, S3, CloudWatch, etc.) —        #
-# AWS-managed `ReadOnlyAccess` covers it. The `github_actions` role is        #
-# narrower (RunTask + Seed) and shouldn't pick up broad read.                  #
+# Separate from `github_actions` so PR plan-only runs don't carry the write   #
+# permissions that the promote/run workflows need. Both roles get             #
+# AWS-managed `ReadOnlyAccess` because plan and apply both need broad read    #
+# across every resource type in this module (ECS, ECR, IAM, S3, CloudWatch). #
 # ---------------------------------------------------------------------------- #
 
 resource "aws_iam_role" "terraform_plan" {

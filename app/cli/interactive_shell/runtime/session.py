@@ -236,13 +236,25 @@ class ReplSession:
             self.token_usage[bucket] = self.token_usage.get(bucket, 0) + count
         self.llm_call_count += 1
 
-    def record(self, kind: str, text: str, *, ok: bool = True) -> None:
+    def record(
+        self,
+        kind: str,
+        text: str,
+        *,
+        ok: bool = True,
+        response_text: str | None = None,
+    ) -> None:
         """Append an entry to the session history.
 
         Supports kinds: "shell", "slash", "alert", "chat", "incoming_alert", etc.
         For "incoming_alert", use record_incoming_alert() instead to preserve metadata.
         """
-        self.history.append({"type": kind, "text": text, "ok": ok})
+        entry: dict[str, Any] = {"type": kind, "text": text, "ok": ok}
+        if response_text:
+            entry["response_text"] = response_text
+
+        self.history.append(entry)
+
         from app.cli.interactive_shell.sessions.store import SessionStore
 
         SessionStore.append_turn(self, kind, text)

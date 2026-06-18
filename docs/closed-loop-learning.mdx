@@ -53,7 +53,7 @@ opensre misses export \
   --out tests/benchmarks/production_misses/
 ```
 
-Each case directory contains an `alert.json` whose `_meta.scoring_points.expected_root_cause` and `_meta.scoring_points.miss_notes` carry the rubric for grading. Commit the directory under `tests/benchmarks/` and the next benchmark run will include the new regressions.
+Each case directory contains an `alert.json` whose `commonAnnotations.scoring_points` dict (`expected_root_cause`, `expected_category`, `miss_notes`) carries the rubric for grading — the same location `opensre investigate --evaluate` already reads from, and the same one `strip_scoring_points_from_alert` removes before the agent sees the alert. The `_meta` block carries non-rubric provenance (`miss_id`, `original_run_id`, `taxonomy`). Commit the directory under `tests/benchmarks/` and the next benchmark run will include the new regressions.
 
 ## Weekly triage workflow
 

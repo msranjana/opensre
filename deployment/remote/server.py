@@ -44,10 +44,10 @@ from nacl.signing import VerifyKey
 from pydantic import BaseModel
 from starlette.responses import JSONResponse, StreamingResponse
 
-from config.version import get_version
 from cli.interactive_shell.error_handling.cli_error_mapping import reraise_cli_runtime_error
 from cli.interactive_shell.error_handling.errors import OpenSREError
 from cli.interactive_shell.ui.output.boundary import install_product_adapters
+from config.version import get_version
 from deployment.remote.error_reporting import report_remote_exception
 from deployment.remote.vercel_poller import (
     VercelInvestigationCandidate,
@@ -455,8 +455,8 @@ async def investigate_stream(req: InvestigateRequest) -> Response:
     as a ``.md`` file once the stream completes, matching the behaviour of
     the blocking ``/investigate`` endpoint.
     """
-    from config.config import LLMSettings
     from cli.investigation import resolve_investigation_context
+    from config.config import LLMSettings
     from core.orchestration.entrypoints import astream_investigation
 
     LLMSettings.from_env()

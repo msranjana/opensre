@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from email.message import EmailMessage
+
+import pytest
+
 from platform.notifications.smtp_delivery import (
     format_background_rca_email,
     send_smtp_report,
     verify_smtp_connection,
 )
-
-import pytest
 
 
 class _FakeSMTP:
@@ -76,7 +77,9 @@ def test_format_background_rca_email_includes_required_sections() -> None:
 
 def test_verify_smtp_connection_uses_starttls(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_client = _FakeSMTP("smtp.example.com", 587, 15)
-    monkeypatch.setattr("platform.notifications.smtp_delivery.smtplib.SMTP", _return_fake_client(fake_client))
+    monkeypatch.setattr(
+        "platform.notifications.smtp_delivery.smtplib.SMTP", _return_fake_client(fake_client)
+    )
 
     ok, detail = verify_smtp_connection(
         {
@@ -136,7 +139,9 @@ def test_verify_smtp_connection_closes_client_when_setup_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_client = _FailingLoginSMTP("smtp.example.com", 587, 15)
-    monkeypatch.setattr("platform.notifications.smtp_delivery.smtplib.SMTP", _return_fake_client(fake_client))
+    monkeypatch.setattr(
+        "platform.notifications.smtp_delivery.smtplib.SMTP", _return_fake_client(fake_client)
+    )
 
     ok, detail = verify_smtp_connection(
         {

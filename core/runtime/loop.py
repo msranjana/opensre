@@ -13,9 +13,9 @@ from core.runtime.context_budget import (
 )
 from core.runtime.execution import execute_tools, public_tool_input
 from core.runtime.messages import build_assistant_message, build_tool_result_messages
+from platform.observability.tool_trace import redact_sensitive
 from services.agent_llm_client import ToolCall
 from tools.registered_tool import RegisteredTool
-from platform.observability.tool_trace import redact_sensitive
 
 logger = logging.getLogger(__name__)
 

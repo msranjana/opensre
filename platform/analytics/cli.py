@@ -7,6 +7,9 @@ from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import Final
+from uuid import uuid4
+
 from platform.analytics.events import Event
 from platform.analytics.provider import Properties, get_analytics
 from platform.analytics.repl_context import get_cli_session_id
@@ -15,9 +18,6 @@ from platform.analytics.source import (
     TriggerMode,
     build_source_properties,
 )
-from typing import Final
-from uuid import uuid4
-
 from platform.observability.sentry_sdk import capture_exception
 
 EVAL_AND_TERMINAL_KPI_QUERIES: Final[dict[str, str]] = {

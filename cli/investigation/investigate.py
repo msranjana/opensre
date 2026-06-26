@@ -9,8 +9,8 @@ import threading
 from collections.abc import Generator, Iterator
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from config.config import resolve_llm_settings
 from cli.interactive_shell.error_handling.cli_error_mapping import reraise_cli_runtime_error
+from config.config import resolve_llm_settings
 from platform.observability.tracing import traceable
 
 if TYPE_CHECKING:

@@ -13,9 +13,9 @@ import boto3
 import requests
 
 from cli.investigation import run_investigation_cli
+from platform.observability.tracing import traceable
 from tests.utils.alert_factory import create_alert
 from tests.utils.conftest import UPSTREAM_DOWNSTREAM_CONFIG
-from platform.observability.tracing import traceable
 
 
 def _pick_field(payload: dict, keys: list[str]) -> str | None:

@@ -385,14 +385,14 @@ class BedrockConverseAgentClient:
     ) -> AgentLLMResponse:
         import botocore.exceptions
 
+        from platform.guardrails.apply import apply_guardrails_to_converse_payload
+        from platform.guardrails.engine import GuardrailBlockedError
         from services.bedrock_converse import (
             is_non_retryable_bedrock_code,
             map_bedrock_client_error,
             parse_converse_output,
             to_converse_messages,
         )
-        from platform.guardrails.apply import apply_guardrails_to_converse_payload
-        from platform.guardrails.engine import GuardrailBlockedError
 
         converse_messages = to_converse_messages(messages)
         converse_messages, system = apply_guardrails_to_converse_payload(

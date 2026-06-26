@@ -38,8 +38,8 @@ from core.domain.stream import StreamEvent
 from deployment.remote.reasoning import reasoning_text
 from platform.analytics.events import Event
 from platform.analytics.provider import get_analytics
-from tools.registry import resolve_tool_display_name
 from platform.observability.tool_trace import format_json_preview
+from tools.registry import resolve_tool_display_name
 
 
 class StreamRenderer:

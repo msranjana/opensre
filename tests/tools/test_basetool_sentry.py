@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
+from platform.observability import sentry_sdk as sentry_mod
 from tools.base import BaseTool
 from tools.registered_tool import REGISTERED_TOOL_ATTR
 from tools.tool_decorator import tool
-from platform.observability import sentry_sdk as sentry_mod
 
 
 class ExplodingBaseTool(BaseTool):

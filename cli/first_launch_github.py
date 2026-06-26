@@ -13,11 +13,11 @@ is also auto-bypassed on Linux and in CI/test environments.
 from __future__ import annotations
 
 import os
-import platform
 
 from rich.console import Console
 from rich.markup import escape
 
+import platform
 from cli.interactive_shell.ui import repl_tty_interactive
 from cli.interactive_shell.ui.theme import DEVICE_CODE
 from platform.analytics.cli import capture_github_login_completed, identify_github_username

@@ -8,8 +8,8 @@ from io import BytesIO
 from typing import Any
 from zipfile import ZipFile
 
-from services.env import make_boto3_client, require_aws_credentials
 from platform.observability.errors import report_exception
+from services.env import make_boto3_client, require_aws_credentials
 
 logger = logging.getLogger(__name__)
 

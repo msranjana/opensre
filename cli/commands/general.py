@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-import platform
 import sys
 import time
 
 import click
 
+import platform
 from cli.interactive_shell.data_store.constants import ALERT_TEMPLATE_CHOICES
 from cli.interactive_shell.data_store.context import is_json_output, is_yes
 from cli.interactive_shell.error_handling.exit_codes import ERROR, SUCCESS

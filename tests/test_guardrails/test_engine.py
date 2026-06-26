@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
+import pytest
+import yaml
+
 from platform.guardrails.audit import AuditLogger
 from platform.guardrails.engine import (
     GuardrailBlockedError,
@@ -10,9 +14,6 @@ from platform.guardrails.engine import (
     reset_guardrail_engine,
 )
 from platform.guardrails.rules import GuardrailAction, GuardrailRule
-
-import pytest
-import yaml
 
 
 def _rule(
@@ -477,9 +478,7 @@ class TestSingleton:
             ),
             encoding="utf-8",
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
         reset_guardrail_engine()
 
         engine = get_guardrail_engine()

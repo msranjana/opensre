@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from platform.guardrails.engine import GuardrailBlockedError, reset_guardrail_engine
 from typing import Any
 
 import pytest
 import yaml
+
+from platform.guardrails.engine import GuardrailBlockedError, reset_guardrail_engine
 
 # ---------------------------------------------------------------------------
 # Shared LLM-client capture fixtures
@@ -109,12 +110,8 @@ class TestLLMClientGuardrails:
                 {"name": "aws_key", "action": "redact", "patterns": ["AKIA[0-9A-Z]{16}"]},
             ],
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
         captured: dict = {}
 
@@ -152,12 +149,8 @@ class TestLLMClientGuardrails:
                 {"name": "blocker", "action": "block", "keywords": ["forbidden"]},
             ],
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
         from services.llm_client import LLMClient
 
@@ -212,12 +205,8 @@ class TestOpenAIClientGuardrails:
                 {"name": "aws_key", "action": "redact", "patterns": ["AKIA[0-9A-Z]{16}"]},
             ],
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
         captured: dict = {}
 
@@ -273,12 +262,8 @@ class TestChatNodeGuardrails:
                 {"name": "aws_key", "action": "redact", "patterns": ["AKIA[0-9A-Z]{16}"]},
             ],
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
         from platform.guardrails.apply import apply_guardrails_to_messages
 
@@ -305,12 +290,8 @@ class TestChatNodeGuardrails:
                 {"name": "blocker", "action": "block", "keywords": ["forbidden"]},
             ],
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
         from platform.guardrails.apply import apply_guardrails_to_messages
 
@@ -329,12 +310,8 @@ class TestChatNodeGuardrails:
                 {"name": "r1", "action": "redact", "keywords": ["secret"]},
             ],
         )
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
         from platform.guardrails.apply import apply_guardrails_to_messages
 
@@ -389,12 +366,8 @@ class TestOverlappingRedactionReachesDownstream:
 
     def _install_rules(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         config = _write_rules(tmp_path, _OVERLAPPING_RULES)
-        monkeypatch.setattr(
-            "platform.guardrails.engine.get_default_rules_path", lambda: config
-        )
-        monkeypatch.setattr(
-            "platform.guardrails.rules.get_default_rules_path", lambda: config
-        )
+        monkeypatch.setattr("platform.guardrails.engine.get_default_rules_path", lambda: config)
+        monkeypatch.setattr("platform.guardrails.rules.get_default_rules_path", lambda: config)
 
     def test_anthropic_client_sends_merged_redaction(
         self,

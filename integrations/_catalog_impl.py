@@ -112,10 +112,10 @@ from integrations.twilio import classify as _classify_twilio
 from integrations.vercel import classify as _classify_vercel
 from integrations.victoria_logs import classify as _classify_victoria_logs
 from integrations.whatsapp import classify as _classify_whatsapp
-from services.temporal import TemporalConfig
-from services.vercel import VercelConfig
 from platform.common.coercion import safe_int
 from platform.observability.errors import report_exception
+from services.temporal import TemporalConfig
+from services.vercel import VercelConfig
 
 logger = logging.getLogger(__name__)
 

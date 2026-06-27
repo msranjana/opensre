@@ -1312,7 +1312,7 @@ def test_credential_line_for_saved_summary_cli_codex() -> None:
     from cli.wizard import config as wizard_config
 
     codex = next(p for p in wizard_config.SUPPORTED_PROVIDERS if p.value == "codex")
-    assert flow._credential_line_for_saved_summary(codex) == ("OpenAI Codex CLI (Run: codex login)")
+    assert flow._credential_line_for_saved_summary(codex) == "OpenAI Codex CLI (Run: codex login)"
 
 
 def test_credential_line_for_saved_summary_cli_claude_code() -> None:

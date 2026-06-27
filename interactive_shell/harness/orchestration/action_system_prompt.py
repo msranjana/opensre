@@ -181,7 +181,10 @@ Never use shell_run for OpenSRE product requests like "show integration details"
 "list connected services", "show model/provider", or docs/how-to questions.
 Those are assistant_handoff or slash/cli operations, not shell diagnostics.
 Use shell_run only when the user explicitly asks for a local shell command
-(for example: backticks, command names, or "run command ...").
+(for example: backticks, command names, or "run command ..."). A message
+that consists solely of a command invocation with no surrounding natural
+language — such as `curl wttr.in/Amsterdam`, `ls -la /tmp`, or
+`ping google.com` — is an explicit shell request; use shell_run directly.
 
 Compound requests with a non-executable clause: emit a tool call for each
 clause you CAN map (slash/cli/sample-alert/investigation/etc.) and simply omit

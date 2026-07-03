@@ -48,6 +48,7 @@ def answer_shell_question(
         reasoning=DefaultReasoningClientProvider(
             output=resolved_output,
             error_reporter=DefaultErrorReporter(),
+            session=session,
         ),
         run_factory=DefaultRunRecordFactory(session),
         error_reporter=DefaultErrorReporter(),

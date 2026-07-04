@@ -6,7 +6,7 @@ direct-answer path (`stream_answer` via the `StreamAnswerFn` seam in
 `ports.py`, no tools). It orchestrates action tool-calling turns, three-path routing,
 conversational answers, evidence gather, and headless execution. It was
 extracted out of `interactive_shell` so the same harness can run the interactive
-terminal and be invoked headlessly via `agent_harness.agents.headless_agent`.
+terminal and be invoked headlessly via `agent_harness.turns.headless_dispatch`.
 
 ## Hard boundary (enforced by tests)
 
@@ -33,22 +33,22 @@ responsibility-scoped subpackage.
 - `agent_builder.py` — `AgentConfig` dataclass + `build_agent(config)`. The
   single instantiation site for `core.agent.Agent` across all surfaces
   (action, evidence, gateway). See "Agent construction pattern" below.
-- `agents/` — the turn drivers that orchestrate `core.agent.Agent`:
-  - `action_agent.py` — `run_action_agent_turn`: one action tool-calling turn
+- `turns/` — the turn drivers that orchestrate `core.agent.Agent`:
+  - `action_driver.py` — `run_action_agent_turn`: one action tool-calling turn
     over the ports. Uses `_build_action_agent` factory that returns an
     `ActionTurnPlan`.
-  - `turn_orchestrator.py` — `run_turn`: the three-path routing
+  - `orchestrator.py` — `run_turn`: the three-path routing
     (summarize-observation / handled / gather+answer) and the conversational
     answer. Resolves integrations **once** at the top of the turn and stores
     them on the frozen `turn_snapshot`, so `turn_snapshot.resolved_integrations` is the
     single source of truth for what the turn knows. Downstream components read
-    `turn_snapshot.resolved_integrations` (e.g. `action_agent._resolved_integrations_for_turn`
+    `turn_snapshot.resolved_integrations` (e.g. `action_driver._resolved_integrations_for_turn`
     prefers it) rather than re-resolving. Do NOT reintroduce a per-component
     integration resolution when `turn_snapshot` already carries it.
-  - `evidence_agent.py` — bounded evidence-gather loop. Uses
+  - `evidence_driver.py` — bounded evidence-gather loop. Uses
     `_build_evidence_agent` factory that returns an `AgentConfig` handed to
     `build_agent`.
-  - `headless_agent.py` — headless programmatic entry point
+  - `headless_dispatch.py` — headless programmatic entry point
     (`dispatch_message_to_headless_agent`) plus in-memory port adapters for
     API / test runs. `tools` is required — surfaces that want a text-only
     turn pass `NullToolProvider()` explicitly.
@@ -91,11 +91,11 @@ to it instead of re-implementing bootstrap + persistence:
   `gateway/storage/session/resolver.py::SessionResolver` owns per-chat
   chat-id ↔ session-id binding + metadata; it delegates `create` / `resolve` /
   `rotate` to `SessionManager`. Turn dispatch uses
-  `Agent.dispatch_message_to_headless_agent` via `gateway/turn_handler.py` with
+  `dispatch_message_to_headless_agent` via `gateway/turn_handler.py` with
   :class:`~core.agent_harness.providers.default_providers.DefaultToolProvider`
   built from the **live per-chat session** each turn (same tool resolution as
   shell). There is no separate gateway-owned ``Agent`` instance.
-- **headless** — ephemeral in-memory sessions (``headless_agent.InMemorySessionStore``)
+- **headless** — ephemeral in-memory sessions (``headless_dispatch.InMemorySessionStore``)
   bypass ``SessionManager`` by design: they never persist to JSONL and do not
   need create/resolve/rotate/close. Tool-calling turns still run through the
   shared harness; only session lifecycle is skipped.
@@ -129,11 +129,11 @@ config = AgentConfig(
 agent = build_agent(config)
 ```
 
-Action (`agents/action_agent.py::_build_action_agent`) and evidence
-(`agents/evidence_agent.py::_build_evidence_agent`) assemble an
+Action (`turns/action_driver.py::_build_action_agent`) and evidence
+(`turns/evidence_driver.py::_build_evidence_agent`) assemble an
 ``AgentConfig`` and call ``build_agent``. The gateway turn path does not
 construct a persistent ``Agent`` — it uses
-``Agent.dispatch_message_to_headless_agent`` with per-turn
+``dispatch_message_to_headless_agent`` with per-turn
 :class:`~core.agent_harness.providers.default_providers.DefaultToolProvider`
 from the live chat session. When ``Agent.__init__``'s signature changes,
 ``agent_builder.py`` is the single edit site for harness surfaces that call
@@ -142,7 +142,7 @@ from the live chat session. When ``Agent.__init__``'s signature changes,
 ## Agent context and data stores
 
 See `docs/agent-context-data-stores.md`. Turn assembly starts in
-``agents/turn_orchestrator.py`` with ``TurnSnapshot.from_session``.
+``turns/orchestrator.py`` with ``TurnSnapshot.from_session``.
 
 **Do NOT** reintroduce per-surface `Agent` subclasses that override
 `build_llm` / `build_system_prompt` / `build_tools` / `resolved_integrations`
@@ -158,7 +158,7 @@ uniformity claim with an exception bolted on:
   tools → observe) driven by `llm.invoke`. Built via `AgentConfig` +
   `build_agent` (the construction pattern above). Used by the action,
   evidence/gather, and investigation agents.
-- **Direct answer (no tools)** — `turn_orchestrator.stream_answer`, one grounded
+- **Direct answer (no tools)** — `orchestrator.stream_answer`, one grounded
   text answer streamed via `client.invoke_stream` (the `StreamAnswerFn` seam in
   `ports.py`). It does **not** use `Agent`: there is no tool loop and no observe
   step, and it streams on a different client method.
@@ -185,7 +185,7 @@ Before opening or merging an agent PR, confirm:
    entrypoint or rename a shape seam.
 
 **Read order for new code:** this file → `docs/agent-context-data-stores.md` →
-`agents/turn_orchestrator.py` (`run_turn`) → `core/agent/agent.py` (facade + wiring)
+`turns/orchestrator.py` (`run_turn`) → `core/agent/agent.py` (facade + wiring)
 → `core/agent/react_loop.py` (`run_react_loop`, the tool-calling algorithm).
 
 ## Investigation agent — the tool-calling shape with a custom loop
@@ -233,9 +233,9 @@ think → call-tools → observe algorithm.
 - `core/agent/react_loop.py` — `ReactLoop` (the loop as a method-object, phases
   `_think` / `_handle_conclusion` / `_observe`) and `run_react_loop` (its thin
   functional entry).
-- `core/agent/agent.py` — the facade: static `dispatch_message_to_headless_agent`
-  / `resolve_integrations` entrypoints, `__init__`, `run()`, and the
-  `_should_accept_conclusion` override hook.
+- `core/agent/agent.py` — the `Agent` facade: `__init__` (holds config), `run()`
+  (builds the per-run `AgentRunInput` via `_build_run_input` and hands it to
+  `run_react_loop`), and the `_should_accept_conclusion` override hook.
 
 Do not reintroduce hook-method overrides on `Agent` itself (e.g. a subclass
 overriding a private `_before_provider_request`-style method) — customize via

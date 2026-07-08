@@ -22,6 +22,9 @@ from surfaces.interactive_shell.command_registry.cli_parity import (
 from surfaces.interactive_shell.command_registry.diagnostics_cmds import (
     COMMANDS as DIAGNOSTICS_COMMANDS,
 )
+from surfaces.interactive_shell.command_registry.gateway_cmds import (
+    COMMANDS as GATEWAY_COMMANDS,
+)
 from surfaces.interactive_shell.command_registry.help import COMMANDS as HELP_COMMANDS
 from surfaces.interactive_shell.command_registry.integrations import (
     COMMANDS as INTEGRATIONS_COMMANDS,
@@ -80,6 +83,7 @@ _MERGED_SEQUENCE = tuple(
         RCA_COMMANDS,
         TASK_COMMANDS,
         WATCH_COMMANDS,
+        GATEWAY_COMMANDS,
         PRIVACY_COMMANDS,
         AGENTS_COMMANDS,
         ALERTS_COMMANDS,

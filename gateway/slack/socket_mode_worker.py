@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
+import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -50,6 +51,7 @@ _MAX_CONVERSATION_LOCKS = 1024
 
 _DENIAL_REPLY = "You're not authorized to use this bot. Ask an admin to add you."
 _NEW_SESSION_REPLY = "Started a new session."
+_TURN_TIMEOUT_MESSAGE = "This is taking longer than expected. Please try again."
 
 
 @dataclass
@@ -107,12 +109,14 @@ class _SlackTurnDispatcher:
         session_resolver: SessionResolver,
         handler: GatewayAgentCallback,
         logger: logging.Logger,
+        bot_user_id: str = "",
     ) -> None:
         self._settings = settings
         self._messaging = messaging
         self._session_resolver = session_resolver
         self._handler = handler
         self._logger = logger
+        self._bot_user_id = bot_user_id
         self._conversation_locks: dict[str, _ConversationLock] = {}
         self._locks_guard = threading.Lock()
         self._resolver_lock = threading.Lock()
@@ -205,13 +209,30 @@ class _SlackTurnDispatcher:
                 return
 
             # Never log message bodies — audit hashes live in messaging_security.
+            # ts vs thread_ts distinguishes a new mention (ts == thread_ts) from a
+            # threaded reply — key to diagnosing session continuity.
+            is_reply = inbound.thread_ts != inbound.ts
             self._logger.info(
-                "inbound platform=slack user=%s channel=%s session=%s chars=%d",
+                "inbound platform=slack user=%s channel=%s thread_ts=%s reply=%s "
+                "session=%s chars=%d",
                 inbound.user_id,
                 inbound.channel_id,
+                inbound.thread_ts,
+                is_reply,
                 session.session_id[:8],
                 len(inbound.text),
             )
+            # Continuity + availability diagnostics: prior-message count shows
+            # whether "yes"-style follow-ups kept context; the slack flag shows
+            # whether the Slack teammate tools will be offered this turn.
+            resolved = getattr(session, "resolved_integrations_cache", None) or {}
+            prior_msgs = len(getattr(session, "cli_agent_messages", []) or [])
+            self._logger.info(
+                "turn setup platform=slack prior_msgs=%d slack_resolved=%s",
+                prior_msgs,
+                "slack" in resolved,
+            )
+            turn_started = time.monotonic()
             mark_turn_working(
                 self._messaging,
                 channel=inbound.channel_id,
@@ -223,15 +244,55 @@ class _SlackTurnDispatcher:
                 thread_ts=inbound.thread_ts,
                 update_interval_seconds=self._settings.status_update_interval_seconds,
             )
+            outcome_lock = threading.Lock()
+            outcome_taken = False
+
+            def _claim_terminal_outcome() -> bool:
+                # The first of {timeout, error, normal completion} to claim owns
+                # the final message + reaction. This keeps a timed-out turn that
+                # later finishes from stacking a done tick over the timeout's
+                # cross, and stops a timeout racing an error from finalizing twice.
+                nonlocal outcome_taken
+                with outcome_lock:
+                    if outcome_taken:
+                        return False
+                    outcome_taken = True
+                    return True
+
+            def _on_turn_timeout() -> None:
+                # A blocking handler cannot be cancelled, so surface a visible
+                # message and mark the turn failed instead of leaving a frozen
+                # placeholder; the orphaned turn keeps running.
+                if not _claim_terminal_outcome():
+                    return
+                self._logger.warning(
+                    "[slack-gateway] turn TIMED OUT after %.0fs channel=%s session=%s",
+                    self._settings.turn_timeout_seconds,
+                    inbound.channel_id,
+                    session.session_id[:8],
+                )
+                try:
+                    sink.finalize(_TURN_TIMEOUT_MESSAGE)
+                except Exception:
+                    self._logger.debug("[slack-gateway] timeout finalize failed", exc_info=True)
+                mark_turn_failed(
+                    self._messaging,
+                    channel=inbound.channel_id,
+                    timestamp=inbound.ts,
+                )
+
+            timer = threading.Timer(self._settings.turn_timeout_seconds, _on_turn_timeout)
+            timer.start()
             try:
                 # Slack thread is the continuity source when the
                 # gateway session file is empty (redeploy / ephemeral disk).
-                if session_needs_thread_seed(session, inbound.text):
+                if session_needs_thread_seed(inbound.text, is_reply=is_reply):
                     seeded = seed_session_from_slack_thread(
                         session,
                         channel_id=inbound.channel_id,
                         thread_ts=inbound.thread_ts,
                         exclude_ts=inbound.ts,
+                        bot_user_id=self._bot_user_id,
                     )
                     if seeded:
                         self._logger.info(
@@ -241,27 +302,61 @@ class _SlackTurnDispatcher:
                 agent_text = _agent_text_with_slack_context(inbound)
                 self._handler(agent_text, session, sink, self._logger)
             except Exception:
-                mark_turn_failed(
+                self._logger.exception(
+                    "[slack-gateway] turn ERRORED after %.1fs channel=%s session=%s",
+                    time.monotonic() - turn_started,
+                    inbound.channel_id,
+                    session.session_id[:8],
+                )
+                # Replace the "Digging in…" placeholder with a visible error —
+                # otherwise a raised turn is indistinguishable from one still
+                # running (only the ✗ reaction changes). Skip if the timeout
+                # already owns the outcome.
+                if _claim_terminal_outcome():
+                    try:
+                        sink.render_error("Something went wrong on that request.")
+                    except Exception:
+                        self._logger.debug("[slack-gateway] error finalize failed", exc_info=True)
+                    mark_turn_failed(
+                        self._messaging,
+                        channel=inbound.channel_id,
+                        timestamp=inbound.ts,
+                    )
+                raise
+            finally:
+                timer.cancel()
+            if _claim_terminal_outcome():
+                self._logger.info(
+                    "[slack-gateway] turn done in %.1fs channel=%s session=%s",
+                    time.monotonic() - turn_started,
+                    inbound.channel_id,
+                    session.session_id[:8],
+                )
+                mark_turn_done(
                     self._messaging,
                     channel=inbound.channel_id,
                     timestamp=inbound.ts,
                 )
-                raise
-            mark_turn_done(
-                self._messaging,
-                channel=inbound.channel_id,
-                timestamp=inbound.ts,
-            )
 
 
 def _agent_text_with_slack_context(inbound: SlackInboundMessage) -> str:
-    """Prefix inbound text with channel/thread ids for teammate tool targeting.
+    """Prefix inbound text with the channel id for teammate tool targeting.
 
-    Keep this a short metadata line — tool routing lives in action prompts.
-    ``thread_ts`` is included so follow-up seeding / thread reads can target
-    the triggering thread without steering every question to channel history.
+    Short metadata line only — tool routing lives in action prompts. The thread
+    ts is omitted so the agent does not copy it into channel reads (which would
+    return one thread instead of channel history); the reply sink and session
+    seeding already target the triggering thread.
     """
-    return f"[Slack channel_id={inbound.channel_id} thread_ts={inbound.thread_ts}]\n{inbound.text}"
+    return f"[Slack channel_id={inbound.channel_id}]\n{inbound.text}"
+
+
+def _resolve_bot_user_id(web_client: WebClient, logger: logging.Logger) -> str:
+    """Return the bot's own Slack user id via auth.test, or '' on failure."""
+    try:
+        return str(web_client.auth_test().get("user_id") or "")
+    except Exception:
+        logger.debug("[slack-gateway] auth.test for bot_user_id failed", exc_info=True)
+        return ""
 
 
 def start_slack_gateway_background(
@@ -278,12 +373,16 @@ def start_slack_gateway_background(
         max_workers=settings.max_concurrent_turns,
         thread_name_prefix="SlackGatewayTurn",
     )
+    # Resolve the bot's own user id once so thread seeding can label the bot's
+    # replies by author, not by fragile text-shape matching.
+    bot_user_id = _resolve_bot_user_id(web_client, logger)
     dispatcher = _SlackTurnDispatcher(
         settings=settings,
         messaging=SlackWebApiClient(web_client),
         session_resolver=SessionResolver(SessionBindingStore(db), platform=_PLATFORM_SLACK),
         handler=handler,
         logger=logger,
+        bot_user_id=bot_user_id,
     )
 
     def _on_request(client: BaseSocketModeClient, request: SocketModeRequest) -> None:

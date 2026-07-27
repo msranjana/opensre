@@ -95,8 +95,10 @@ class GuardrailEngine:
 
         matches: list[ScanMatch] = []
         text_lower = text.lower()
+        non_blocking_count = 0
 
         for rule in self._rules:
+            is_blocking = rule.action == GuardrailAction.BLOCK
             for pattern in rule.patterns:
                 for m in pattern.finditer(text):
                     matches.append(
@@ -108,12 +110,14 @@ class GuardrailEngine:
                             end=m.end(),
                         )
                     )
-                    if len(matches) >= _MAX_MATCHES:
-                        break
-                if len(matches) >= _MAX_MATCHES:
+                    if not is_blocking:
+                        non_blocking_count += 1
+                        if non_blocking_count >= _MAX_MATCHES:
+                            break
+                if not is_blocking and non_blocking_count >= _MAX_MATCHES:
                     break
 
-            if len(matches) >= _MAX_MATCHES:
+            if not is_blocking and non_blocking_count >= _MAX_MATCHES:
                 break
 
             for keyword in rule.keywords:
@@ -131,12 +135,14 @@ class GuardrailEngine:
                             end=idx + len(keyword),
                         )
                     )
-                    if len(matches) >= _MAX_MATCHES:
-                        break
+                    if not is_blocking:
+                        non_blocking_count += 1
+                        if non_blocking_count >= _MAX_MATCHES:
+                            break
                     start = idx + len(keyword)
-                if len(matches) >= _MAX_MATCHES:
+                if not is_blocking and non_blocking_count >= _MAX_MATCHES:
                     break
-            if len(matches) >= _MAX_MATCHES:
+            if not is_blocking and non_blocking_count >= _MAX_MATCHES:
                 break
 
         blocking_rules = tuple(m.rule_name for m in matches if m.action == GuardrailAction.BLOCK)
